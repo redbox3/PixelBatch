@@ -1,0 +1,424 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'">
+  <title>PixelBatch</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><span class="brand-mark"></span>PixelBatch</div>
+    <div class="preset-bar">
+      <label class="muted" for="presetSelect">Preset</label>
+      <select id="presetSelect"></select>
+      <span id="dirtyDot" class="dirty" title="Unsaved changes" hidden>●</span>
+      <button id="btnSave" class="btn">Save</button>
+      <button id="btnSaveAs" class="btn">Save as…</button>
+      <div class="menu-wrap">
+        <button id="btnPresetMenu" class="btn icon" title="More preset actions">⋯</button>
+        <div id="presetMenu" class="menu" hidden>
+          <button data-act="new">New preset</button>
+          <button data-act="duplicate">Duplicate</button>
+          <button data-act="rename">Rename…</button>
+          <button data-act="revert">Revert changes</button>
+          <hr>
+          <button data-act="import">Import presets…</button>
+          <button data-act="export">Export this preset…</button>
+          <hr>
+          <button data-act="restore">Add starter presets</button>
+          <button data-act="delete" class="danger">Delete preset</button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="layout">
+    <!-- Files -->
+    <section class="panel files-panel">
+      <div class="panel-head">
+        <div class="btn-row">
+          <button id="btnAddFiles" class="btn primary-soft">+ Files</button>
+          <button id="btnAddFolder" class="btn primary-soft">+ Folder</button>
+          <button id="btnClear" class="btn ghost" title="Remove all files">Clear</button>
+        </div>
+        <div class="btn-row">
+          <label class="check small"><input type="checkbox" id="optRecursive" checked> Subfolders</label>
+          <div class="seg small" id="viewToggle">
+            <button data-view="grid" class="on" title="Thumbnail view">▦</button>
+            <button data-view="list" title="List view">☰</button>
+          </div>
+        </div>
+      </div>
+      <div class="panel-sub">
+        <span id="fileCount" class="muted">No files</span>
+        <input type="range" id="thumbSize" min="80" max="220" value="128" title="Thumbnail size">
+      </div>
+      <div id="fileArea" class="file-area">
+        <div id="emptyDrop" class="empty-drop">
+          <div class="drop-icon">⇪</div>
+          <strong>Drop images, folders, SVGs or PDFs here</strong>
+          <span class="muted">or use + Files / + Folder</span>
+          <span class="muted tiny">JPG · PNG · WebP · GIF · AVIF · TIFF · SVG · PDF</span>
+        </div>
+        <div id="fileGrid" class="file-grid"></div>
+      </div>
+    </section>
+
+    <!-- Preview -->
+    <section class="panel preview-panel">
+      <div class="panel-head">
+        <div class="btn-row">
+          <span id="pvSizeWrap" class="btn-row"><label class="muted small" for="pvSize">Size</label>
+          <select id="pvSize" class="small"></select></span>
+          <span id="pvPageWrap" class="btn-row" hidden>
+            <button id="pvPrev" class="btn icon small">‹</button>
+            <span id="pvPage" class="small muted">1/1</span>
+            <button id="pvNext" class="btn icon small">›</button>
+          </span>
+        </div>
+        <div class="btn-row">
+          <div class="seg small" id="pvMode">
+            <button data-mode="side" class="on">Side by side</button>
+            <button data-mode="split">Split</button>
+            <button data-mode="result">Result</button>
+            <button data-mode="original">Original</button>
+          </div>
+          <div class="seg small" id="pvZoom">
+            <button data-zoom="fit" class="on">Fit</button>
+            <button data-zoom="1">100%</button>
+          </div>
+        </div>
+      </div>
+      <div id="pvStage" class="pv-stage mode-side">
+        <div id="pvEmpty" class="pv-empty muted">Select a file to preview the result with the current preset</div>
+        <figure class="pv-pane pv-orig"><figcaption>Original</figcaption><div class="pv-scroll"><img id="pvOrigImg" alt=""></div></figure>
+        <figure class="pv-pane pv-res"><figcaption>Result</figcaption><div class="pv-scroll"><img id="pvResImg" alt=""></div></figure>
+        <div class="pv-split">
+          <div class="pv-split-inner">
+            <img id="pvSplitOrig" alt="">
+            <div id="pvSplitClip" class="pv-split-clip"><img id="pvSplitRes" alt=""></div>
+            <div id="pvSplitHandle" class="pv-split-handle"><span>⇆</span></div>
+          </div>
+        </div>
+        <div id="pvSpinner" class="spinner" hidden></div>
+      </div>
+      <div class="pv-info">
+        <div id="pvInfoOrig" class="info-col"></div>
+        <div class="info-arrow">→</div>
+        <div id="pvInfoRes" class="info-col"></div>
+      </div>
+      <div id="pvWarn" class="pv-warn" hidden></div>
+    </section>
+
+    <!-- Settings -->
+    <section class="panel settings-panel">
+      <div class="settings-scroll" id="settings">
+
+        <div class="seg full" id="modeToggle">
+          <button data-mode="convert" class="on" title="Resize and convert each image">Convert</button>
+          <button data-mode="sheet" title="Combine images into contact sheet / grid images">Contact sheet</button>
+          <button data-mode="pdf" title="Combine images into a PDF document">PDF</button>
+          <button data-mode="rename" title="Copy or move files with new names, no re-encoding">Rename</button>
+        </div>
+
+        <details open data-modes="convert">
+          <summary>Sizes</summary>
+          <div id="sizeList" class="size-list"></div>
+          <div class="btn-row">
+            <button id="btnAddSize" class="btn small">+ Add size</button>
+            <select id="quickSize" class="small">
+              <option value="">Quick add…</option>
+              <option value="3840,2160,4K UHD">4K UHD 3840×2160</option>
+              <option value="1920,1080,Full HD">Full HD 1920×1080</option>
+              <option value="1280,720,HD">HD 1280×720</option>
+              <option value="2048,2048,Large">Large 2048 (long edge)</option>
+              <option value="1080,1080,IG Square">Instagram square 1080×1080</option>
+              <option value="1080,1350,IG Portrait">Instagram portrait 1080×1350</option>
+              <option value="1080,1920,Story">Story / Reel 1080×1920</option>
+              <option value="1200,630,OG">Facebook / OG link 1200×630</option>
+              <option value="1500,500,X Header">X header 1500×500</option>
+              <option value="1584,396,LinkedIn Banner">LinkedIn banner 1584×396</option>
+              <option value="1280,720,YouTube Thumb">YouTube thumbnail 1280×720</option>
+              <option value="800,,800w">800 wide</option>
+              <option value="400,400,Thumb">Thumbnail 400</option>
+              <option value="150,150,Icon">Small 150</option>
+            </select>
+          </div>
+          <p class="hint">Leave width or height blank to keep proportions. Each ticked size creates its own file.</p>
+
+          <div class="field">
+            <label>Resize mode</label>
+            <select data-bind="fit">
+              <option value="contain">Keep ratio — fit inside</option>
+              <option value="pad">Keep ratio — pad to exact size</option>
+              <option value="cover">Keep ratio — crop to fill</option>
+              <option value="fill">Ignore ratio — stretch</option>
+              <option value="none">No resizing (original size)</option>
+            </select>
+          </div>
+          <div class="field" data-show="cover">
+            <label>Crop focus</label>
+            <select data-bind="position">
+              <option value="centre">Centre</option>
+              <option value="top">Top</option>
+              <option value="bottom">Bottom</option>
+              <option value="left">Left</option>
+              <option value="right">Right</option>
+              <option value="attention">Smart (most interesting area)</option>
+              <option value="entropy">Smart (most detail)</option>
+            </select>
+          </div>
+          <label class="check" data-show="resize"><input type="checkbox" data-bind="enlarge"> Allow enlarging smaller images</label>
+          <div class="field inline">
+            <label>Background</label>
+            <input type="color" data-bind="background">
+            <label class="check"><input type="checkbox" data-bind="transparentBg"> Transparent where possible</label>
+          </div>
+          <p class="hint">Background fills padding and replaces transparency for JPG/BMP.</p>
+        </details>
+
+        <details open data-modes="convert,sheet">
+          <summary>Format &amp; compression</summary>
+          <div class="field">
+            <label>Output format</label>
+            <select data-bind="format">
+              <option value="original">Same as source</option>
+              <option value="jpeg">JPG</option>
+              <option value="png">PNG</option>
+              <option value="webp">WebP</option>
+              <option value="avif">AVIF</option>
+              <option value="gif">GIF</option>
+              <option value="tiff">TIFF</option>
+              <option value="bmp">BMP</option>
+              <option value="ico">ICO (Windows icon)</option>
+            </select>
+          </div>
+          <div class="field" data-show="quality">
+            <label>Quality <output data-out="quality"></output></label>
+            <input type="range" min="1" max="100" data-bind="quality" data-type="number">
+          </div>
+          <div data-show="target">
+            <label class="check"><input type="checkbox" data-bind="targetEnabled"> Target maximum file size</label>
+            <div class="field inline" data-show="targetOn">
+              <input type="number" min="1" step="1" data-bind="targetKB" data-type="number" class="num">
+              <span class="muted">KB</span>
+              <label class="muted small">min quality</label>
+              <input type="number" min="1" max="95" data-bind="targetMinQuality" data-type="number" class="num small">
+            </div>
+            <p class="hint" data-show="targetOn">Finds the best quality that fits. PNG/GIF reduce colours instead.</p>
+          </div>
+          <label class="check" data-show="jpeg"><input type="checkbox" data-bind="progressive"> Progressive JPG</label>
+          <div data-show="png">
+            <label class="check"><input type="checkbox" data-bind="pngPalette"> Reduce colours (smaller, like TinyPNG)</label>
+            <div class="field inline" data-show="pngPalette"><label class="muted small">Colours</label><input type="number" min="2" max="256" data-bind="pngColours" data-type="number" class="num small"></div>
+          </div>
+          <label class="check" data-show="webp"><input type="checkbox" data-bind="webpLossless"> Lossless WebP</label>
+          <div data-show="gif">
+            <div class="field inline"><label class="muted small">Colours</label><input type="number" min="2" max="256" data-bind="gifColours" data-type="number" class="num small">
+              <label class="muted small">Dither</label><input type="range" min="0" max="100" data-bind="gifDither" data-type="number" class="grow"></div>
+            <div class="field"><label>Lossy GIF compression <output data-out="gifLossy"></output></label><input type="range" min="0" max="32" data-bind="gifLossy" data-type="number"></div>
+          </div>
+          <label class="check" data-show="anim"><input type="checkbox" data-bind="keepAnimation"> Keep animation (animated GIF / WebP)</label>
+          <div class="field" data-show="tiff">
+            <label>TIFF compression</label>
+            <select data-bind="tiffCompression"><option value="lzw">LZW (lossless)</option><option value="deflate">Deflate (lossless)</option><option value="jpeg">JPEG (lossy)</option><option value="none">None</option></select>
+          </div>
+          <div class="field" data-show="ico">
+            <label>Icon sizes</label>
+            <div class="chips" id="icoSizes"></div>
+          </div>
+        </details>
+
+        <details data-modes="convert,sheet,pdf">
+          <summary>Adjustments</summary>
+          <label class="check"><input type="checkbox" data-bind="autoOrient"> Auto-rotate from camera orientation</label>
+          <div class="field inline">
+            <label>Rotate</label>
+            <select data-bind="rotate" data-type="number"><option value="0">0°</option><option value="90">90° ↻</option><option value="180">180°</option><option value="270">90° ↺</option></select>
+            <label class="check"><input type="checkbox" data-bind="flipH"> Flip ↔</label>
+            <label class="check"><input type="checkbox" data-bind="flipV"> Flip ↕</label>
+          </div>
+          <label class="check"><input type="checkbox" data-bind="grayscale"> Black &amp; white</label>
+          <div class="field"><label>Sharpen <output data-out="sharpen"></output></label><input type="range" min="0" max="100" data-bind="sharpen" data-type="number"></div>
+          <div class="field"><label>Brightness <output data-out="brightness" data-suffix="%"></output></label><input type="range" min="50" max="150" data-bind="brightness" data-type="number"></div>
+          <div class="field"><label>Saturation <output data-out="saturation" data-suffix="%"></output></label><input type="range" min="0" max="200" data-bind="saturation" data-type="number"></div>
+        </details>
+
+        <details data-modes="convert">
+          <summary>Watermark</summary>
+          <label class="check"><input type="checkbox" data-bind="watermark.enabled"> Add watermark</label>
+          <div data-show="wm">
+            <div class="seg small full" id="wmType">
+              <button data-wm="text">Text</button>
+              <button data-wm="image">Logo image</button>
+            </div>
+            <div class="field" data-show="wmText"><label>Text</label><input type="text" data-bind="watermark.text"></div>
+            <div class="field inline" data-show="wmText"><label>Colour</label><input type="color" data-bind="watermark.color"></div>
+            <div class="field" data-show="wmImage">
+              <label>Logo file</label>
+              <div class="path-row"><input type="text" data-bind="watermark.imagePath" readonly placeholder="PNG or SVG with transparency"><button id="btnWmImage" class="btn small">Browse</button></div>
+            </div>
+            <div class="field inline top">
+              <label>Position</label>
+              <div class="pos-grid" id="wmPos"></div>
+              <div class="grow">
+                <div class="field"><label>Opacity <output data-out="watermark.opacity" data-suffix="%"></output></label><input type="range" min="5" max="100" data-bind="watermark.opacity" data-type="number"></div>
+                <div class="field"><label>Size <output data-out="watermark.scale" data-suffix="% of width"></output></label><input type="range" min="1" max="60" data-bind="watermark.scale" data-type="number"></div>
+              </div>
+            </div>
+          </div>
+        </details>
+
+        <details data-modes="convert,sheet,pdf">
+          <summary>PDF &amp; SVG input</summary>
+          <div class="field"><label>PDF pages</label><input type="text" data-bind="pdfPages" placeholder="all, first, 1-3, 5, 7-end"></div>
+          <div class="field"><label>Resolution when not resizing <output data-out="vectorDpi" data-suffix=" dpi"></output></label><input type="range" min="72" max="600" step="6" data-bind="vectorDpi" data-type="number"></div>
+          <label class="check"><input type="checkbox" data-bind="pdfTransparent"> Transparent PDF background (PNG/WebP)</label>
+          <p class="hint">With sizes set, SVG and PDF are rendered directly at the target size, so they stay sharp.</p>
+        </details>
+
+        <details open data-modes="sheet">
+          <summary>Contact sheet</summary>
+          <div class="field inline">
+            <label class="muted small">Columns</label><input type="number" min="1" max="50" data-bind="sheet.columns" data-type="number" class="num small">
+            <label class="muted small">Rows per sheet</label><input type="number" min="0" max="200" data-bind="sheet.rows" data-type="number" class="num small">
+          </div>
+          <p class="hint">Rows 0 = everything on one sheet. More images than fit start a new sheet.</p>
+          <div class="field inline">
+            <label class="muted small">Cell</label><input type="number" min="16" max="4000" data-bind="sheet.cellWidth" data-type="number" class="num small">
+            <span class="muted">×</span><input type="number" min="16" max="4000" data-bind="sheet.cellHeight" data-type="number" class="num small"><span class="muted small">px</span>
+          </div>
+          <div class="field inline">
+            <label class="muted small">Gap</label><input type="number" min="0" max="500" data-bind="sheet.gap" data-type="number" class="num small">
+            <label class="muted small">Margin</label><input type="number" min="0" max="1000" data-bind="sheet.margin" data-type="number" class="num small"><span class="muted small">px</span>
+          </div>
+          <div class="field inline">
+            <label class="muted small">Images</label>
+            <select data-bind="sheet.fit" class="small"><option value="contain">Fit whole image in cell</option><option value="cover">Crop to fill cell</option></select>
+            <label class="muted small">Background</label><input type="color" data-bind="sheet.background">
+          </div>
+          <div class="field"><label>Title (optional)</label><input type="text" data-bind="sheet.title" placeholder="e.g. Product shoot, March"></div>
+          <label class="check"><input type="checkbox" data-bind="sheet.captions"> File names under images</label>
+          <div class="field inline" data-show="sheetCaptions">
+            <label class="muted small">Text size</label><input type="number" min="6" max="200" data-bind="sheet.captionSize" data-type="number" class="num small">
+            <label class="muted small">Colour</label><input type="color" data-bind="sheet.captionColor">
+          </div>
+          <p class="hint" id="sheetDims"></p>
+        </details>
+
+        <details open data-modes="pdf">
+          <summary>PDF document</summary>
+          <div class="field inline">
+            <label class="muted small">Page</label>
+            <select data-bind="pdf.pageSize" class="small"><option value="a4">A4</option><option value="a3">A3</option><option value="a5">A5</option><option value="letter">Letter</option><option value="legal">Legal</option><option value="tabloid">Tabloid</option><option value="image">Fit page to each image</option></select>
+            <select data-bind="pdf.orientation" class="small" data-show="pdfFixedPage"><option value="auto">Auto-rotate per image</option><option value="portrait">Portrait</option><option value="landscape">Landscape</option></select>
+          </div>
+          <div class="field inline">
+            <label class="muted small">Margin</label><input type="number" min="0" max="100" step="1" data-bind="pdf.marginMm" data-type="number" class="num small"><span class="muted small">mm</span>
+          </div>
+          <div class="seg small full" id="pdfLayout">
+            <button data-layout="single">One image per page</button>
+            <button data-layout="grid">Grid of images</button>
+          </div>
+          <div data-show="pdfGrid">
+            <div class="field inline">
+              <label class="muted small">Columns</label><input type="number" min="1" max="12" data-bind="pdf.columns" data-type="number" class="num small">
+              <label class="muted small">Rows</label><input type="number" min="1" max="20" data-bind="pdf.rows" data-type="number" class="num small">
+              <label class="muted small">Gap</label><input type="number" min="0" max="50" data-bind="pdf.gapMm" data-type="number" class="num small"><span class="muted small">mm</span>
+            </div>
+          </div>
+          <div class="field inline">
+            <label class="muted small">Images</label>
+            <select data-bind="pdf.fit" class="small"><option value="contain">Fit whole image</option><option value="cover">Crop to fill</option></select>
+          </div>
+          <div class="field"><label>Title on each page (optional)</label><input type="text" data-bind="pdf.title"></div>
+          <label class="check"><input type="checkbox" data-bind="pdf.captions"> File names under images</label>
+          <label class="check"><input type="checkbox" data-bind="pdf.pageNumbers"> Page numbers</label>
+          <div class="field" data-show="pdfLossy"><label>Image quality <output data-out="pdf.quality"></output></label><input type="range" min="10" max="100" data-bind="pdf.quality" data-type="number"></div>
+          <div class="field"><label>Max image resolution <output data-out="pdf.maxDpi" data-suffix=" dpi"></output></label><input type="range" min="72" max="600" step="6" data-bind="pdf.maxDpi" data-type="number"></div>
+          <label class="check"><input type="checkbox" data-bind="pdf.lossless"> Lossless images (much larger file)</label>
+          <p class="hint">150 dpi suits screens and email, 300 dpi suits print.</p>
+        </details>
+
+        <details open data-modes="convert,rename">
+          <summary>Rename</summary>
+          <div class="field"><label>File name pattern</label><input type="text" data-bind="renamePattern" id="renamePattern" spellcheck="false"></div>
+          <div class="chips tokens" id="tokens"></div>
+          <div class="name-example" id="nameExample"></div>
+          <div class="field inline">
+            <label class="muted small">Start {n} at</label><input type="number" min="0" data-bind="renameStart" data-type="number" class="num small">
+            <label class="muted small">Case</label>
+            <select data-bind="rename.case" class="small"><option value="none">As is</option><option value="lower">lowercase</option><option value="upper">UPPERCASE</option><option value="slug">web-safe-slug</option></select>
+          </div>
+          <div class="field inline">
+            <label class="muted small">Spaces</label>
+            <select data-bind="rename.spaces" class="small"><option value="keep">Keep</option><option value="dash">→ dash</option><option value="underscore">→ underscore</option></select>
+          </div>
+          <div class="field inline">
+            <input type="text" data-bind="rename.find" placeholder="Find" class="grow">
+            <input type="text" data-bind="rename.replace" placeholder="Replace with" class="grow">
+          </div>
+          <label class="check" data-show="renameMode"><input type="checkbox" data-bind="renameMove"> Move files instead of copying</label>
+        </details>
+
+        <details open>
+          <summary>Output</summary>
+          <div class="field">
+            <label>Output folder</label>
+            <div class="path-row"><input type="text" data-bind="outputDir" spellcheck="false" placeholder="Choose a folder"><button id="btnOutDir" class="btn small">Browse</button><button id="btnOpenOut" class="btn small icon" title="Open folder">↗</button></div>
+          </div>
+          <div data-modes="sheet,pdf">
+            <div class="field"><label>File name</label><input type="text" data-bind="combineName" id="combineName" spellcheck="false"></div>
+            <div class="chips tokens" id="combineTokens"></div>
+            <div class="name-example" id="combineExample"></div>
+            <div class="field inline">
+              <label class="muted small">Make</label>
+              <select data-bind="groupBy" class="small"><option value="all">One file from all images</option><option value="folder">One file per source folder</option></select>
+            </div>
+          </div>
+          <label class="check" data-modes="convert,rename"><input type="checkbox" data-bind="keepStructure"> Recreate source folder structure</label>
+          <label class="check" data-modes="convert"><input type="checkbox" data-bind="subfolderPerSize"> Separate subfolder for each size</label>
+          <div class="field inline">
+            <label class="muted small">If file exists</label>
+            <select data-bind="conflict" class="small"><option value="increment">Add number (1)</option><option value="overwrite">Overwrite</option><option value="skip">Skip</option></select>
+          </div>
+          <label class="check" data-modes="convert"><input type="checkbox" data-bind="keepMetadata"> Keep metadata (EXIF, GPS, copyright)</label>
+          <label class="check" data-modes="convert"><input type="checkbox" data-bind="preserveDates"> Keep original file dates</label>
+        </details>
+      </div>
+    </section>
+  </main>
+
+  <footer class="bottombar">
+    <div class="status">
+      <div id="statusText" class="muted">Ready</div>
+      <div class="progress"><div id="progressBar"></div></div>
+    </div>
+    <button id="btnSummary" class="btn ghost" hidden>Last run</button>
+    <button id="btnCancel" class="btn" hidden>Cancel</button>
+    <button id="btnProcess" class="btn primary" disabled>Process</button>
+  </footer>
+
+  <div id="dropOverlay" class="drop-overlay" hidden><div>Drop to add</div></div>
+
+  <dialog id="dlgText" class="dlg">
+    <form method="dialog">
+      <h3 id="dlgTextTitle"></h3>
+      <input type="text" id="dlgTextInput">
+      <div class="btn-row end"><button value="cancel" class="btn ghost">Cancel</button><button value="ok" class="btn primary">OK</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="dlgSummary" class="dlg wide">
+    <form method="dialog">
+      <h3>Batch complete</h3>
+      <div id="summaryBody"></div>
+      <div class="btn-row end"><button type="button" id="btnSumOpen" class="btn">Open output folder</button><button value="ok" class="btn primary">Close</button></div>
+    </form>
+  </dialog>
+
+  <div id="toast" class="toast" hidden></div>
+  <script src="renderer.js"></script>
+</body>
+</html>

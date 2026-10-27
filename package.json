@@ -1,0 +1,52 @@
+{
+  "name": "pixelbatch",
+  "version": "1.0.0",
+  "description": "Batch image resizer, converter and renamer",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron .",
+    "test": "node test/run.js",
+    "dist:win": "electron-builder --win",
+    "dist:mac": "electron-builder --mac"
+  },
+  "author": "ProAVL",
+  "type": "commonjs",
+  "dependencies": {
+    "mupdf": "^1.28.1",
+    "sharp": "^0.35.5"
+  },
+  "devDependencies": {
+    "electron": "^45.0.0",
+    "electron-builder": "^26.18.0"
+  },
+  "productName": "PixelBatch",
+  "build": {
+    "appId": "com.proavl.pixelbatch",
+    "productName": "PixelBatch",
+    "files": [
+      "src/**/*",
+      "package.json"
+    ],
+    "asarUnpack": [
+      "node_modules/sharp/**",
+      "node_modules/@img/**",
+      "node_modules/mupdf/**"
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    },
+    "mac": {
+      "target": [
+        "dmg"
+      ],
+      "category": "public.app-category.graphics-design"
+    }
+  }
+}
