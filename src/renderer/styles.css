@@ -209,3 +209,6 @@ details[open] > summary::before { transform: rotate(90deg); }
 .sum-list.warn { color: var(--warn); }
 .toast { position: fixed; z-index: 60; bottom: 70px; left: 50%; transform: translateX(-50%); background: var(--panel-2); border: 1px solid var(--line); padding: 8px 16px; border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,.35); }
 #modeToggle button { padding: 5px 4px; font-size: 12px; white-space: nowrap; }
+.size-extra { grid-column: 2 / -1; display: flex; align-items: center; gap: 10px; font-size: 11px; color: var(--muted); margin: -2px 0 4px; }
+.size-extra label { display: flex; align-items: center; gap: 4px; }
+.size-extra input { width: 58px; padding: 2px 5px; font-size: 11px; }

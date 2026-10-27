@@ -134,8 +134,18 @@ function predictSize(w, h, size, preset) {
   return { width: W, height: H };
 }
 
+// A ticked size with no width or height means "full size": the image is not resized.
 function activeSizes(preset) {
-  return (preset.sizes || []).filter(s => s.enabled !== false && (s.width || s.height));
+  return (preset.sizes || []).filter(s => s.enabled !== false);
+}
+
+// A size can override the preset's quality and maximum file size.
+function encodingFor(preset, size) {
+  if (!size) return preset;
+  const p = { ...preset };
+  if (size.quality > 0) p.quality = size.quality;
+  if (size.targetKB > 0) { p.targetEnabled = true; p.targetKB = size.targetKB; }
+  return p;
 }
 
 // ---------- colour helpers ----------
@@ -403,7 +413,7 @@ async function renderVariant(src, size, preset) {
   if (preset.keepMetadata) img = img.keepMetadata();
   else if (preset.keepIcc !== false) img = img.withIccProfile('srgb');
 
-  const result = await encode(img, fmt, preset);
+  const result = await encode(img, fmt, encodingFor(preset, size));
   return { ...result, format: fmt, ext: EXT[fmt], animated, srcWidth: srcW, srcHeight: srcH, warnings: [...warnings, ...result.warnings] };
 }
 
@@ -536,13 +546,20 @@ async function thumbnail(filePath, max = 320) {
       const w = x1 - x0, h = y1 - y0;
       const png = renderPdfPage(mupdf, doc, 0, Math.min(4, max / Math.max(w, h)), false);
       const data = await sharp(png).webp({ quality: 75 }).toBuffer();
-      return { data, type: 'image/webp', width: Math.round(w), height: Math.round(h), pages: doc.countPages(), format: 'pdf' };
+      // PDF pages are measured in points (1/72 inch).
+      return { data, type: 'image/webp', width: Math.round(w), height: Math.round(h), unit: 'pt', pages: doc.countPages(), format: 'pdf' };
     } finally { doc.destroy(); }
   }
   const img = sharp(filePath, { density: ext === 'svg' ? 144 : undefined, failOn: 'none', limitInputPixels: false });
-  const meta = await img.metadata();
+  // The 144 dpi render keeps SVG thumbnails sharp, but its size is 2x the SVG's own size, so measure at the default 72 dpi.
+  const meta = ext === 'svg' ? await sharp(filePath).metadata() : await img.metadata();
   const data = await img.autoOrient().resize(max, max, { fit: 'inside', withoutEnlargement: true }).webp({ quality: 75 }).toBuffer();
-  return { data, type: 'image/webp', width: meta.autoOrient?.width || meta.width, height: meta.autoOrient?.height || meta.pageHeight || meta.height, pages: meta.pages || 1, format: meta.format, animated: (meta.pages || 1) > 1 && ext !== 'tif' && ext !== 'tiff' };
+  return {
+    data, type: 'image/webp', unit: 'px',
+    width: meta.autoOrient?.width || meta.width, height: meta.autoOrient?.height || meta.pageHeight || meta.height,
+    dpi: ext !== 'svg' && meta.density ? Math.round(meta.density) : null,
+    pages: meta.pages || 1, format: meta.format, animated: (meta.pages || 1) > 1 && ext !== 'tif' && ext !== 'tiff',
+  };
 }
 
 // Downscaled original for the "before" side of the preview.

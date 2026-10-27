@@ -71,6 +71,16 @@ const presets = [
     sizes: [size('Email', 1600, 1600, '')] },
   { ...base, name: 'Social squares (crop)', fit: 'cover', position: 'attention', format: 'jpeg', quality: 88, transparentBg: false,
     sizes: [size('Square', 1080, 1080, '_1080sq'), size('Portrait', 1080, 1350, '_1080x1350'), size('Story', 1080, 1920, '_story')] },
+  // Magazine front covers: print-size master plus newsletter, web and EDM thumbnails, each with its own file size limit.
+  { ...base, name: 'Magazine cover set', format: 'jpeg', quality: 90, fit: 'cover', position: 'centre', transparentBg: false,
+    vectorDpi: 300, pdfPages: 'first', renamePattern: '{name}{suffix}', rename: { ...base.rename, spaces: 'dash' },
+    outputDir: 'D:\\Downloads\\Front covers',
+    sizes: [
+      { ...size('Full size', null, null, '_full'), quality: 100 },
+      { ...size('Newsletter', 200, 273, '_newsletter'), quality: 100, targetKB: 50 },
+      { ...size('Web', 216, 296, '_web'), quality: 100, targetKB: 19.5 },
+      { ...size('EDM hero', 512, 698, '_edm'), quality: 100, targetKB: 90 },
+    ] },
   { ...base, name: 'Animated GIF 480', format: 'gif', gifColours: 128, keepAnimation: true,
     sizes: [size('480', 480, null, '_480')] },
   { ...base, name: 'PDF / SVG to PNG 300dpi', fit: 'none', format: 'png', vectorDpi: 300, pdfPages: 'all' },

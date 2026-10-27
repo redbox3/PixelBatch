@@ -24,7 +24,15 @@ const store = {
 };
 
 const clone = o => JSON.parse(JSON.stringify(o));
-const fmtBytes = b => b == null ? '–' : b < 1024 ? `${b} B` : b < 1048576 ? `${(b / 1024).toFixed(b < 10240 ? 1 : 0)} KB` : `${(b / 1048576).toFixed(2)} MB`;
+// Images in pixels (with stored DPI, if any); PDF pages in points plus the mm equivalent.
+const MM_PT = 72 / 25.4;
+function fmtDims(m, compact) {
+  if (!m) return '…';
+  const x = compact ? '×' : ' × ';
+  if (m.unit === 'pt') return `${m.width}${x}${m.height} pt (${Math.round(m.width / MM_PT)}${x}${Math.round(m.height / MM_PT)} mm)`;
+  return `${m.width}${x}${m.height} px${m.dpi && !compact ? ` · ${m.dpi} dpi` : ''}`;
+}
+const fmtBytes = b =>b == null ? '–' : b < 1024 ? `${b} B` : b < 1048576 ? `${(b / 1024).toFixed(b < 10240 ? 1 : 0)} KB` : `${(b / 1048576).toFixed(2)} MB`;
 const FORMAT_LABEL = { jpeg: 'JPG', jpg: 'JPG', png: 'PNG', webp: 'WebP', avif: 'AVIF', gif: 'GIF', tiff: 'TIFF', tif: 'TIFF', bmp: 'BMP', ico: 'ICO', svg: 'SVG', pdf: 'PDF' };
 const fmtLabel = f => FORMAT_LABEL[String(f).toLowerCase()] || String(f).toUpperCase();
 
@@ -255,7 +263,7 @@ function changed({ preview = true } = {}) {
 }
 
 function activeSizes() {
-  return (state.draft.sizes || []).filter(s => s.enabled !== false && (s.width || s.height));
+  return (state.draft.sizes || []).filter(s => s.enabled !== false);
 }
 
 function renderSizes() {
@@ -272,16 +280,28 @@ function renderSizes() {
       <span class="x">×</span>
       <input type="number" data-k="height" min="1" placeholder="auto">
       <input type="text" data-k="suffix" placeholder="_suffix">
-      <button class="del" title="Remove size">✕</button>`;
+      <button class="del" title="Remove size">✕</button>
+      <div class="size-extra">
+        <label title="Overrides the preset's quality for this size">Quality <input type="number" data-k="quality" min="1" max="100" placeholder="preset"></label>
+        <label title="Largest file this size may be; quality is lowered until it fits">Max <input type="number" data-k="targetKB" min="1" step="any" placeholder="preset"> KB</label>
+        <span class="muted">${s.width || s.height ? '' : 'Full size — not resized'}</span>
+      </div>`;
     row.querySelector('[data-k=label]').value = s.label || '';
     row.querySelector('[data-k=width]').value = s.width ?? '';
     row.querySelector('[data-k=height]').value = s.height ?? '';
     row.querySelector('[data-k=suffix]').value = s.suffix ?? '';
+    row.querySelector('[data-k=quality]').value = s.quality ?? '';
+    row.querySelector('[data-k=targetKB]').value = s.targetKB ?? '';
     row.addEventListener('input', e => {
       const k = e.target.dataset.k;
       if (!k) return;
       if (k === 'enabled') s.enabled = e.target.checked;
-      else if (k === 'width' || k === 'height') s[k] = e.target.value ? Math.max(1, parseInt(e.target.value, 10)) : null;
+      else if (k === 'width' || k === 'height') {
+        s[k] = e.target.value ? Math.max(1, parseInt(e.target.value, 10)) : null;
+        row.querySelector('.size-extra .muted').textContent = s.width || s.height ? '' : 'Full size — not resized';
+      }
+      else if (k === 'quality') s.quality = e.target.value ? Math.min(100, Math.max(1, parseInt(e.target.value, 10))) : null;
+      else if (k === 'targetKB') s.targetKB = e.target.value ? Math.max(1, Number(e.target.value)) : null;
       else s[k] = e.target.value;
       refreshSizeSelect();
       changed();
@@ -313,7 +333,7 @@ function refreshSizeSelect() {
     sizes.forEach((s, i) => {
       const o = document.createElement('option');
       o.value = i;
-      o.textContent = `${s.label || 'Size ' + (i + 1)} — ${s.width || 'auto'}×${s.height || 'auto'}`;
+      o.textContent = `${s.label || 'Size ' + (i + 1)} — ${s.width || s.height ? `${s.width || 'auto'}×${s.height || 'auto'}` : 'full size'}`;
       sel.appendChild(o);
     });
     state.sizeIndex = Math.min(state.sizeIndex, sizes.length - 1);
@@ -422,7 +442,7 @@ function pumpThumbs() {
 
 function fileItemHtml(f) {
   const m = f.meta;
-  const dims = m ? `${m.width}×${m.height}` : '…';
+  const dims = fmtDims(m, true);
   const extra = m?.pages > 1 ? (f.ext === 'pdf' ? ` · ${m.pages} pages` : ` · ${m.pages} frames`) : '';
   return `
     <div class="th">${f.thumbUrl ? `<img src="${f.thumbUrl}" alt="">` : f.thumbError ? '<span class="muted tiny">No preview</span>' : ''}</div>
@@ -520,7 +540,7 @@ function renderOrigInfo() {
   const f = state.files[state.selected];
   if (!f) return;
   const m = f.meta;
-  $('#pvInfoOrig').innerHTML = `<b>${m ? `${m.width} × ${m.height}` : '…'}</b> · ${fmtLabel(f.ext)} · ${fmtBytes(f.bytes)}<div class="fn">${escapeHtml(f.name)}</div>`;
+  $('#pvInfoOrig').innerHTML = `<b>${fmtDims(m)}</b> ·${fmtLabel(f.ext)} · ${fmtBytes(f.bytes)}<div class="fn">${escapeHtml(f.name)}</div>`;
 }
 
 async function runPreview() {
@@ -571,7 +591,7 @@ async function runPreview() {
     const pct = f.bytes ? Math.round((1 - r.bytes / f.bytes) * 100) : 0;
     const saving = ['pdf', 'svg'].includes(f.ext) ? '' : pct >= 0 ? `<span class="saving">−${pct}%</span>` : `<span class="saving bigger">+${-pct}%</span>`;
     const q = r.quality && ['jpeg', 'webp', 'avif'].includes(r.format) ? ` · q${r.quality}` : '';
-    $('#pvInfoRes').innerHTML = `<b>${r.width} × ${r.height}</b> · ${fmtLabel(r.format)}${r.animated ? ' (animated)' : ''} · ${fmtBytes(r.bytes)} ${saving}${q}<div class="fn">${escapeHtml(r.fileName)}</div>`;
+    $('#pvInfoRes').innerHTML = `<b>${r.width} × ${r.height} px</b> ·${fmtLabel(r.format)}${r.animated ? ' (animated)' : ''} · ${fmtBytes(r.bytes)} ${saving}${q}<div class="fn">${escapeHtml(r.fileName)}</div>`;
     $('#pvWarn').hidden = !r.warnings?.length;
     $('#pvWarn').textContent = (r.warnings || []).join(' ');
     state.pageCount = r.pageCount || 1;
