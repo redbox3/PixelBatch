@@ -12,12 +12,15 @@ const thumbCache = new Map();
 
 const presetsFile = () => path.join(app.getPath('userData'), 'presets.json');
 
+// A folder that is not a full path on this platform (e.g. a D:\ path on a Mac) is replaced with one in Pictures.
+const withOutputDir = p => path.isAbsolute(p.outputDir || '') ? p : { ...p, outputDir: path.join(app.getPath('pictures'), 'PixelBatch', p.name) };
+
 function loadPresets() {
   try {
     const list = JSON.parse(fs.readFileSync(presetsFile(), 'utf8'));
-    if (Array.isArray(list) && list.length) return list.map(withDefaults);
+    if (Array.isArray(list) && list.length) return list.map(withDefaults).map(withOutputDir);
   } catch {}
-  return defaults.map(p => ({ ...p, outputDir: p.outputDir || path.join(app.getPath('pictures'), 'PixelBatch', p.name) }));
+  return defaults.map(withOutputDir);
 }
 
 function savePresets(list) {

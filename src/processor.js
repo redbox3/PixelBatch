@@ -444,7 +444,10 @@ function buildName(pattern, ctx, rename) {
     return m;
   });
   if (rename?.find) {
-    try { out = out.replace(new RegExp(rename.find, rename.findRegex ? 'g' : 'gi'), rename.replace || ''); }
+    // Plain text unless findRegex is set: escape it and insert the replacement literally (no $1 or $&).
+    const find = rename.findRegex ? rename.find : rename.find.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const replace = rename.findRegex ? rename.replace || '' : () => rename.replace || '';
+    try { out = out.replace(new RegExp(find, rename.findRegex ? 'g' : 'gi'), replace); }
     catch { out = out.split(rename.find).join(rename.replace || ''); }
   }
   if (rename?.spaces === 'dash') out = out.replace(/\s+/g, '-');
@@ -467,15 +470,21 @@ function outputDirFor(file, preset, size) {
   return dir;
 }
 
+// Names are claimed in `reserved` before the disk check is awaited, so parallel workers never get the same path.
 async function reservePath(target, conflict, reserved) {
-  const exists = async p => reserved.has(p.toLowerCase()) || await fsp.access(p).then(() => true, () => false);
-  if (!(await exists(target))) { reserved.add(target.toLowerCase()); return target; }
-  if (conflict === 'overwrite' && !reserved.has(target.toLowerCase())) { reserved.add(target.toLowerCase()); return target; }
-  if (conflict === 'skip' && !reserved.has(target.toLowerCase())) return null;
+  const onDisk = p => fsp.access(p).then(() => true, () => false);
+  const key = target.toLowerCase();
+  if (!reserved.has(key)) {
+    reserved.add(key);
+    if (!(await onDisk(target)) || conflict === 'overwrite') return target;
+    if (conflict === 'skip') { reserved.delete(key); return null; }
+  }
   const { dir, name, ext } = path.parse(target);
   for (let i = 1; i < 10000; i++) {
     const p = path.join(dir, `${name} (${i})${ext}`);
-    if (!(await exists(p))) { reserved.add(p.toLowerCase()); return p; }
+    if (reserved.has(p.toLowerCase())) continue;
+    reserved.add(p.toLowerCase());
+    if (!(await onDisk(p))) return p;
   }
   throw new Error('Too many name conflicts');
 }

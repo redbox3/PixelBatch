@@ -637,6 +637,7 @@ async function processAll() {
     renderForm(); setDirty(true);
   }
   state.running = true;
+  state.moving = preset.mode === 'rename' && !!preset.renameMove;
   for (const f of state.files) { f.status = ''; f.error = ''; updateFileItem(f); }
   $('#btnCancel').hidden = false;
   $('#btnProcess').disabled = true;
@@ -655,11 +656,23 @@ async function processAll() {
     state.running = false;
     $('#btnCancel').hidden = true;
     updateVisibility();
+    if (state.moving) { state.moving = false; updateNameExample(); schedulePreview(0); }
   }
+}
+
+// After a move-rename the list must point at the new paths, or previews and the next run fail.
+function followMove(f, to) {
+  f.path = to;
+  f.name = to.split(/[\\/]/).pop();
+  f.root = to.slice(0, -f.name.length - 1);
+  f.ext = f.name.includes('.') ? f.name.split('.').pop().toLowerCase() : '';
+  if (f.el) f.el.dataset.path = to;
 }
 
 function onProgress(d) {
   const f = state.files.find(x => x.path === d.path);
+  const movedTo = state.moving && d.status === 'done' && d.results?.[0]?.output;
+  if (f && movedTo) followMove(f, movedTo);
   if (f) { f.status = d.status; f.error = d.error || ''; updateFileItem(f); }
   $('#progressBar').style.width = `${(d.done / d.total) * 100}%`;
   $('#statusText').textContent = `Processing… ${d.done}/${d.total}${d.status === 'error' ? ` — ${f?.name}: ${d.error}` : ''}`;
