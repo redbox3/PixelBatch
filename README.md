@@ -27,7 +27,12 @@ To build the Mac `.dmg`, run `npm install` and then `npm run dist:mac` **on a Ma
 - SVG and PDF are rendered straight at the target size, so they stay sharp.
 
 **Sizes and resizing**
-- Any number of named sizes in each preset. Each ticked size gives its own output file. Leave the width or height blank to keep proportions.
+- Any number of named sizes in each preset. Each ticked size gives its own output file. Leave the width or height blank to keep proportions, or both blank for full size.
+- Each size has its own unit:
+  - **px**
+  - **% of the original**, for example 50%. For a PDF, the original is the page rendered at the *Resolution when not resizing* setting.
+  - **mm, cm, inches or pt** at a DPI you choose (300 by default). The DPI is also saved in the file, so print and layout apps open it at the right physical size.
+- Each size can also set its own quality and maximum file size (KB).
 - Quick-add list: 4K, Full HD, Instagram, Stories, OG/Facebook, X header, LinkedIn banner, YouTube thumbnail and more.
 - Resize modes: *fit inside* (keeps the ratio), *pad to exact size* (keeps the ratio and fills with a background colour), *crop to fill* (with a centre, edge or smart focus), *stretch* (ignores the ratio), or *no resizing*.
 - Option to block upscaling, plus a background colour or transparency.

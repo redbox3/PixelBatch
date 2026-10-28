@@ -276,15 +276,20 @@ function renderSizes() {
     row.innerHTML = `
       <input type="checkbox" data-k="enabled" ${s.enabled !== false ? 'checked' : ''} title="Include this size">
       <input type="text" data-k="label" placeholder="Name">
-      <input type="number" data-k="width" min="1" placeholder="auto">
+      <input type="number" data-k="width" min="0" step="any" placeholder="auto">
       <span class="x">×</span>
-      <input type="number" data-k="height" min="1" placeholder="auto">
+      <input type="number" data-k="height" min="0" step="any" placeholder="auto">
       <input type="text" data-k="suffix" placeholder="_suffix">
       <button class="del" title="Remove size">✕</button>
       <div class="size-extra">
+        <select data-k="unit" title="Unit for width and height">
+          <option value="px">px</option><option value="%">% of original</option><option value="mm">mm</option>
+          <option value="cm">cm</option><option value="in">inches</option><option value="pt">pt</option>
+        </select>
+        <label class="dpi" title="Pixels per inch used to turn mm/cm/in/pt into pixels; also saved in the file">at <input type="number" data-k="dpi" min="1" max="2400" placeholder="300"> dpi</label>
         <label title="Overrides the preset's quality for this size">Quality <input type="number" data-k="quality" min="1" max="100" placeholder="preset"></label>
         <label title="Largest file this size may be; quality is lowered until it fits">Max <input type="number" data-k="targetKB" min="1" step="any" placeholder="preset"> KB</label>
-        <span class="muted">${s.width || s.height ? '' : 'Full size — not resized'}</span>
+        <span class="muted"></span>
       </div>`;
     row.querySelector('[data-k=label]').value = s.label || '';
     row.querySelector('[data-k=width]').value = s.width ?? '';
@@ -292,17 +297,31 @@ function renderSizes() {
     row.querySelector('[data-k=suffix]').value = s.suffix ?? '';
     row.querySelector('[data-k=quality]').value = s.quality ?? '';
     row.querySelector('[data-k=targetKB]').value = s.targetKB ?? '';
+    row.querySelector('[data-k=unit]').value = s.unit || 'px';
+    row.querySelector('[data-k=dpi]').value = s.dpi ?? '';
+    const syncRow = () => {
+      row.querySelector('.dpi').hidden = !PHYSICAL_UNITS.includes(s.unit);
+      row.querySelector('.size-extra .muted').textContent = s.width || s.height ? '' : 'Full size — not resized';
+    };
+    syncRow();
     row.addEventListener('input', e => {
       const k = e.target.dataset.k;
       if (!k) return;
       if (k === 'enabled') s.enabled = e.target.checked;
       else if (k === 'width' || k === 'height') {
-        s[k] = e.target.value ? Math.max(1, parseInt(e.target.value, 10)) : null;
-        row.querySelector('.size-extra .muted').textContent = s.width || s.height ? '' : 'Full size — not resized';
+        // Pixels are whole numbers; %, mm, cm, in and pt may have decimals.
+        const v = Number(e.target.value);
+        s[k] = e.target.value && v > 0 ? ((s.unit || 'px') === 'px' ? Math.max(1, Math.round(v)) : v) : null;
       }
+      else if (k === 'unit') {
+        s.unit = e.target.value;
+        if (PHYSICAL_UNITS.includes(s.unit) && !s.dpi) { s.dpi = 300; row.querySelector('[data-k=dpi]').value = 300; }
+      }
+      else if (k === 'dpi') s.dpi = e.target.value ? Math.max(1, Math.round(Number(e.target.value))) : null;
       else if (k === 'quality') s.quality = e.target.value ? Math.min(100, Math.max(1, parseInt(e.target.value, 10))) : null;
       else if (k === 'targetKB') s.targetKB = e.target.value ? Math.max(1, Number(e.target.value)) : null;
       else s[k] = e.target.value;
+      syncRow();
       refreshSizeSelect();
       changed();
     });
@@ -312,11 +331,21 @@ function renderSizes() {
   refreshSizeSelect();
 }
 
-function addSize(width, height, label) {
+const PHYSICAL_UNITS = ['mm', 'cm', 'in', 'pt'];
+
+// Size as typed, with its unit, e.g. "50%", "210×297 mm", "1920×auto px".
+function fmtSize(s) {
+  if (!s.width && !s.height) return 'full size';
+  const unit = s.unit || 'px';
+  if (unit === '%') return s.width && s.height && s.width !== s.height ? `${s.width}%×${s.height}%` : `${s.width || s.height}%`;
+  return `${s.width || 'auto'}×${s.height || 'auto'} ${unit}${PHYSICAL_UNITS.includes(unit) ? ` @ ${s.dpi || 300} dpi` : ''}`;
+}
+
+function addSize(width, height, label, unit = 'px', dpi) {
   state.draft.sizes ||= [];
   label ||= width && height ? `${width}x${height}` : `${width || height}`;
   const suffix = '_' + label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-  state.draft.sizes.push({ label, width: width || null, height: height || null, suffix, enabled: true });
+  state.draft.sizes.push({ label, width: width || null, height: height || null, unit, ...(dpi ? { dpi } : {}), suffix, enabled: true });
   if (state.draft.fit === 'none') state.draft.fit = 'contain';
   renderForm();
   changed();
@@ -333,7 +362,7 @@ function refreshSizeSelect() {
     sizes.forEach((s, i) => {
       const o = document.createElement('option');
       o.value = i;
-      o.textContent = `${s.label || 'Size ' + (i + 1)} — ${s.width || s.height ? `${s.width || 'auto'}×${s.height || 'auto'}` : 'full size'}`;
+      o.textContent = `${s.label || 'Size ' + (i + 1)} — ${fmtSize(s)}`;
       sel.appendChild(o);
     });
     state.sizeIndex = Math.min(state.sizeIndex, sizes.length - 1);
@@ -719,8 +748,8 @@ function wire() {
   $('#btnAddSize').addEventListener('click', () => addSize(1200, 1200, 'New size'));
   $('#quickSize').addEventListener('change', e => {
     if (!e.target.value) return;
-    const [w, h, label] = e.target.value.split(',');
-    addSize(w ? +w : null, h ? +h : null, label);
+    const [w, h, label, unit, dpi] = e.target.value.split(',');
+    addSize(w ? +w : null, h ? +h : null, label, unit || 'px', dpi ? +dpi : undefined);
     e.target.value = '';
   });
   $('#tokens').addEventListener('click', e => { const c = e.target.closest('[data-token]'); if (c) insertToken(c.dataset.token, '#renamePattern', 'renamePattern'); });

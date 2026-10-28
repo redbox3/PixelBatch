@@ -212,3 +212,6 @@ details[open] > summary::before { transform: rotate(90deg); }
 .size-extra { grid-column: 2 / -1; display: flex; align-items: center; gap: 10px; font-size: 11px; color: var(--muted); margin: -2px 0 4px; }
 .size-extra label { display: flex; align-items: center; gap: 4px; }
 .size-extra input { width: 58px; padding: 2px 5px; font-size: 11px; }
+.size-extra { flex-wrap: wrap; row-gap: 4px; }
+.size-extra select { padding: 1px 4px; font-size: 11px; }
+.size-extra .dpi input { width: 50px; }

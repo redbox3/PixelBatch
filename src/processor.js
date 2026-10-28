@@ -93,6 +93,22 @@ function renderPdfPage(mupdf, doc, index, scale, alpha) {
 
 // ---------- geometry ----------
 
+const UNIT_MM = { mm: 1, cm: 10, in: 25.4, pt: 25.4 / 72 };
+const isPhysical = size => !!UNIT_MM[size?.unit];
+
+// Converts a size's width/height from its unit into pixels. Percentages are of the
+// full-size image (refW × refH px); mm/cm/in/pt use the size's DPI (default 300).
+function sizeInPx(size, refW, refH) {
+  const unit = size?.unit || 'px';
+  if (unit === 'px') return size;
+  const px = (v, ref) => {
+    if (!v) return null;
+    if (unit === '%') return Math.max(1, Math.round(ref * v / 100));
+    return Math.max(1, Math.round(v * UNIT_MM[unit] / 25.4 * (size.dpi || 300)));
+  };
+  return { ...size, width: px(size.width, refW), height: px(size.height, refH) };
+}
+
 // The scale a vector source (SVG/PDF, in 72dpi units) must be rasterised at so that
 // the largest requested output is rendered crisply rather than upscaled.
 function vectorScale(w, h, preset) {
@@ -100,7 +116,8 @@ function vectorScale(w, h, preset) {
   const fallback = (preset.vectorDpi || 150) / 72;
   if (preset.fit === 'none' || !sizes.length || !w || !h) return fallback;
   let scale = 0;
-  for (const s of sizes) {
+  for (const size of sizes) {
+    const s = sizeInPx(size, w * fallback, h * fallback);
     const sx = s.width ? s.width / w : 0;
     const sy = s.height ? s.height / h : 0;
     let need;
@@ -320,6 +337,12 @@ async function encode(img, fmt, p) {
 
 // ---------- pipeline ----------
 
+// Full size of a vector source in px: its 72dpi size rendered at the "resolution when not resizing".
+function fullSize(w, h, preset) {
+  const s = (preset.vectorDpi || 150) / 72;
+  return { w: Math.round(w * s), h: Math.round(h * s) };
+}
+
 // Yields the rasterised sources for an input file: one per PDF page, otherwise one.
 async function loadSources(file, preset, { previewPage } = {}) {
   const ext = path.extname(file).slice(1).toLowerCase();
@@ -336,14 +359,15 @@ async function loadSources(file, preset, { previewPage } = {}) {
         const [x0, y0, x1, y1] = page.getBounds();
         page.destroy();
         const scale = vectorScale(x1 - x0, y1 - y0, preset);
-        return { input: renderPdfPage(mupdf, doc, i, scale, alpha), opts: {}, page: i + 1, pageCount: count, srcFormat: 'pdf' };
+        return { input: renderPdfPage(mupdf, doc, i, scale, alpha), opts: {}, page: i + 1, pageCount: count, srcFormat: 'pdf', full: fullSize(x1 - x0, y1 - y0, preset) };
       });
     } finally { doc.destroy(); }
   }
   if (ext === 'svg') {
     const meta = await sharp(file).metadata();
     const density = Math.min(72 * vectorScale(meta.width, meta.height, preset), 100000);
-    return [{ input: file, opts: { density }, page: null, pageCount: 1, srcFormat: 'svg' }];
+    // SVGs are already sized in px, so % is of that size (as shown in the file list).
+    return [{ input: file, opts: { density }, page: null, pageCount: 1, srcFormat: 'svg', full: { w: meta.width, h: meta.height } }];
   }
   const animated = !!preset.keepAnimation && ANIMATABLE.includes(fmt) && ANIMATABLE.includes(ext);
   return [{ input: file, opts: { animated }, page: null, pageCount: 1, srcFormat: ext }];
@@ -378,6 +402,10 @@ async function renderVariant(src, size, preset) {
 
   const swap = preset.rotate && Math.abs(Number(preset.rotate)) % 180 === 90;
   const baseW = swap ? srcH : srcW, baseH = swap ? srcW : srcH;
+  // Vector sources are rasterised larger than full size, so % is measured against their full size instead.
+  const [refW, refH] = src.full ? (swap ? [src.full.h, src.full.w] : [src.full.w, src.full.h]) : [baseW, baseH];
+  const unitSize = size;
+  size = sizeInPx(size, refW, refH);
 
   if (size && preset.fit !== 'none' && (size.width || size.height)) {
     const oneSide = !size.width || !size.height;
@@ -412,6 +440,9 @@ async function renderVariant(src, size, preset) {
 
   if (preset.keepMetadata) img = img.keepMetadata();
   else if (preset.keepIcc !== false) img = img.withIccProfile('srgb');
+
+  // Physical sizes record their DPI so print and layout apps open them at the right size.
+  if (isPhysical(unitSize)) img = img.withDensity(unitSize.dpi || 300);
 
   const result = await encode(img, fmt, encodingFor(preset, size));
   return { ...result, format: fmt, ext: EXT[fmt], animated, srcWidth: srcW, srcHeight: srcH, warnings: [...warnings, ...result.warnings] };
