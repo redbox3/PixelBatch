@@ -94,7 +94,7 @@ input[type=checkbox] { accent-color: var(--accent); margin: 0; }
 .file-area { position: relative; flex: 1; overflow: auto; padding: 10px; }
 .empty-drop { position: absolute; inset: 12px; border: 2px dashed var(--line); border-radius: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; text-align: center; padding: 20px; }
 .drop-icon { font-size: 34px; color: var(--accent); }
-.file-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(var(--thumb, 128px), 1fr)); gap: 8px; }
+.file-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(var(--thumb, 128px), 100%), var(--thumb, 128px))); justify-content: start; gap: 8px; }
 .file-item { position: relative; background: var(--panel-2); border: 1px solid var(--line); border-radius: var(--radius); padding: 6px; cursor: pointer; }
 .file-item:hover { border-color: #4a5160; }
 .file-item.sel { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
