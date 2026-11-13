@@ -6,7 +6,12 @@ const sharp = require('sharp');
 
 sharp.cache({ memory: 256, files: 0 });
 
-const INPUT_EXT = ['.jpg', '.jpeg', '.jpe', '.jfif', '.png', '.webp', '.gif', '.avif', '.tif', '.tiff', '.svg', '.pdf'];
+const RAW = require('./raw');
+
+const INPUT_EXT = ['.jpg', '.jpeg', '.jpe', '.jfif', '.png', '.webp', '.gif', '.avif', '.tif', '.tiff', '.svg', '.pdf', ...RAW.RAW_EXT];
+
+// What sharp should open: the file itself, or for camera RAW files the full-size JPEG embedded in them.
+const imageInput = file => (RAW.isRaw(file) ? RAW.extractPreview(file) : Promise.resolve(file));
 const ANIMATABLE = ['gif', 'webp'];
 const LOSSY_Q = ['jpeg', 'webp', 'avif'];
 const EXT = { jpeg: 'jpg', png: 'png', webp: 'webp', avif: 'avif', gif: 'gif', tiff: 'tif', bmp: 'bmp', ico: 'ico' };
@@ -369,6 +374,7 @@ async function loadSources(file, preset, { previewPage } = {}) {
     // SVGs are already sized in px, so % is of that size (as shown in the file list).
     return [{ input: file, opts: { density }, page: null, pageCount: 1, srcFormat: 'svg', full: { w: meta.width, h: meta.height } }];
   }
+  if (RAW.isRaw(file)) return [{ input: await RAW.extractPreview(file), opts: {}, page: null, pageCount: 1, srcFormat: 'jpg' }];
   const animated = !!preset.keepAnimation && ANIMATABLE.includes(fmt) && ANIMATABLE.includes(ext);
   return [{ input: file, opts: { animated }, page: null, pageCount: 1, srcFormat: ext }];
 }
@@ -590,7 +596,7 @@ async function thumbnail(filePath, max = 320) {
       return { data, type: 'image/webp', width: Math.round(w), height: Math.round(h), unit: 'pt', pages: doc.countPages(), format: 'pdf' };
     } finally { doc.destroy(); }
   }
-  const img = sharp(filePath, { density: ext === 'svg' ? 144 : undefined, failOn: 'none', limitInputPixels: false });
+  const img = sharp(await imageInput(filePath), { density: ext === 'svg' ? 144 : undefined, failOn: 'none', limitInputPixels: false });
   // The 144 dpi render keeps SVG thumbnails sharp, but its size is 2x the SVG's own size, so measure at the default 72 dpi.
   const meta = ext === 'svg' ? await sharp(filePath).metadata() : await img.metadata();
   const data = await img.autoOrient().resize(max, max, { fit: 'inside', withoutEnlargement: true }).webp({ quality: 75 }).toBuffer();
@@ -619,7 +625,7 @@ async function original(filePath, page = 0, max = 2000) {
     const meta = await sharp(filePath).metadata();
     if ((meta.pages || 1) > 1) return { data: await fsp.readFile(filePath), type: `image/${ext}` };
   }
-  const data = await sharp(filePath, { density: ext === 'svg' ? 144 : undefined, failOn: 'none', limitInputPixels: false })
+  const data = await sharp(await imageInput(filePath), { density: ext === 'svg' ? 144 : undefined, failOn: 'none', limitInputPixels: false })
     .autoOrient().resize(max, max, { fit: 'inside', withoutEnlargement: true }).png({ compressionLevel: 3 }).toBuffer();
   return { data, type: 'image/png' };
 }
@@ -989,4 +995,4 @@ async function encodePng(r, fmt) {
   return r.buffer.subarray(r.buffer.readUInt32LE(last + 12), r.buffer.readUInt32LE(last + 12) + r.buffer.readUInt32LE(last + 8));
 }
 
-module.exports = { isCombine, processCombine, previewCombine, INPUT_EXT, scanPaths, processFile, preview, thumbnail, original, buildName, parsePageSpec, predictSize, activeSizes };
+module.exports = { imageInput, isCombine, processCombine, previewCombine, INPUT_EXT, scanPaths, processFile, preview, thumbnail, original, buildName, parsePageSpec, predictSize, activeSizes };

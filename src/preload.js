@@ -27,6 +27,9 @@ contextBridge.exposeInMainWorld('api', {
   buildName: (pattern, ctx, rename) => call('buildName', pattern, ctx, rename),
   open: p => call('open', p),
   reveal: p => call('reveal', p),
+  cullAnalyse: (files, opts) => call('cull:analyse', files, opts),
+  cullRegroup: opts => call('cull:regroup', opts),
+  onCullProgress: fn => ipcRenderer.on('cull-progress', (e, d) => fn(d)),
   onProgress: fn => ipcRenderer.on('progress', (e, d) => fn(d)),
   onMenu: fn => ipcRenderer.on('menu', (e, d) => fn(d)),
 });

@@ -25,6 +25,15 @@ To build the Mac `.dmg`, run `npm install` and then `npm run dist:mac` **on a Ma
 - Drag and drop files or folders anywhere on the window, or use **+ Files** / **+ Folder**. Subfolders are included unless you turn that off.
 - Reads JPG, PNG, WebP, GIF (including animated), AVIF, TIFF, SVG and PDF (every page, or a range like `1-3, 5, 7-end`).
 - SVG and PDF are rendered straight at the target size, so they stay sharp.
+- **Camera RAW files** (Nikon NEF/NRW, Canon CR2, Sony ARW/SR2, Pentax PEF, DNG) are read from the full-size JPEG the camera stores inside them. This is fast (about 0.3 s per photo) and needs no RAW converter. It looks like the camera's own JPEG, without the extra adjustment a RAW editor like Lightroom allows. Canon CR3 and Fuji RAF aren't supported yet.
+- Hidden `._` files that a Mac leaves when copying to Windows or USB drives are skipped.
+
+**Pick best shots** (the **★ Best** button)
+- Groups similar photos: shots taken close together (within 10 s, 30 s, 1 min, 5 min or at any time) that look alike. *Near identical* groups only burst frames; *Loosely alike* also groups shots of a scene from slightly different angles.
+- Scores each photo for sharpness and exposure. Sharpness is measured where the photo is sharpest, so a shallow-focus portrait isn't marked down for its blurred background. Photos that look blurred, have blown highlights or are very dark are flagged.
+- Picks the best 1, 2 or 3 of each group, and shots with no similar neighbour are always picked. Click a photo to change the pick; double-click to see it large (← → to move, space to pick).
+- **Keep picks only** leaves just the picks in the file list, ready to process. **Show all again** brings the rest back. No files are moved or deleted.
+- It can't judge expressions, closed eyes or composition, so check the picks in groups of people.
 
 **Sizes and resizing**
 - Any number of named sizes in each preset. Each ticked size gives its own output file. Leave the width or height blank to keep proportions, or both blank for full size.

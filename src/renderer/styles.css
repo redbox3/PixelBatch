@@ -215,3 +215,33 @@ details[open] > summary::before { transform: rotate(90deg); }
 .size-extra { flex-wrap: wrap; row-gap: 4px; }
 .size-extra select { padding: 1px 4px; font-size: 11px; }
 .size-extra .dpi input { width: 50px; }
+
+/* ---------- pick best shots ---------- */
+.link { background: none; border: 0; color: var(--accent); padding: 0; font-size: 12px; text-decoration: underline; }
+.cull { position: fixed; inset: 0; z-index: 40; background: var(--bg); display: grid; grid-template-rows: auto auto 1fr auto; }
+.cull-head { display: flex; align-items: center; gap: 18px; padding: 12px 16px; background: var(--panel); border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.cull-head h2 { margin: 0; font-size: 16px; }
+.cull-head .btn-row { flex: 1; }
+.cull-status { padding: 8px 16px; display: flex; flex-direction: column; gap: 5px; }
+.cull-status .progress { max-width: 520px; }
+#cullBar { height: 100%; width: 0; background: var(--accent); transition: width .2s; }
+.cull-body { overflow: auto; padding: 4px 16px 24px; }
+.cull-group { margin: 10px 0 18px; }
+.cull-group h3 { font-size: 12.5px; font-weight: 600; margin: 0 0 8px; color: var(--muted); }
+.cull-group h3 b { color: var(--text); }
+.cull-strip { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; }
+.cull-card { position: relative; background: var(--panel); border: 2px solid var(--line); border-radius: 8px; padding: 5px; cursor: pointer; opacity: .55; transition: opacity .15s; }
+.cull-card:hover { opacity: .85; }
+.cull-card.pick { border-color: var(--ok); opacity: 1; }
+.cull-card img { width: 100%; aspect-ratio: 3 / 2; object-fit: contain; background: #000; border-radius: 4px; display: block; }
+.cull-card .nm { font-size: 11.5px; margin-top: 4px; display: flex; justify-content: space-between; gap: 6px; }
+.cull-card .bar { height: 4px; border-radius: 2px; background: var(--field); margin-top: 4px; overflow: hidden; }
+.cull-card .bar i { display: block; height: 100%; background: var(--accent); }
+.cull-card .flags { font-size: 10.5px; color: var(--warn); min-height: 14px; margin-top: 3px; }
+.cull-card .star { position: absolute; top: 9px; left: 9px; background: var(--ok); color: #fff; font-size: 11px; font-weight: 700; border-radius: 4px; padding: 1px 6px; display: none; }
+.cull-card.pick .star { display: block; }
+.cull-foot { display: flex; align-items: center; gap: 10px; padding: 10px 16px; background: var(--panel); border-top: 1px solid var(--line); }
+.cull-foot #cullSummary { flex: 1; }
+.cull-lightbox { position: absolute; inset: 0; background: rgba(0,0,0,.88); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 20px; }
+.cull-lightbox img { max-width: 100%; max-height: calc(100% - 60px); object-fit: contain; }
+.cull-lb-bar { display: flex; gap: 10px; align-items: center; color: #fff; }

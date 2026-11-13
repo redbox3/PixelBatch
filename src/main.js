@@ -3,6 +3,7 @@ const path = require('path');
 const fs = require('fs');
 const os = require('os');
 const P = require('./processor');
+const C = require('./cull');
 const defaults = require('./defaultPresets');
 const { withDefaults } = defaults;
 
@@ -109,6 +110,16 @@ handle('open', p => shell.openPath(p));
 handle('reveal', p => shell.showItemInFolder(p));
 
 handle('cancel', () => { cancelled = true; return true; });
+
+// Pick best shots: analysis is kept so regrouping with other settings is instant.
+let cullItems = [];
+handle('cull:analyse', async (files, opts) => {
+  cancelled = false;
+  const { items, errors } = await C.analyse(files, (done, total, name) => win.webContents.send('cull-progress', { done, total, name }), () => cancelled);
+  cullItems = items;
+  return { groups: C.forRenderer(C.pick(C.group(items, opts), opts)), errors, cancelled };
+});
+handle('cull:regroup', opts => C.forRenderer(C.pick(C.group(cullItems, opts), opts)));
 
 async function processCombined(files, preset) {
   const startedAt = Date.now();
