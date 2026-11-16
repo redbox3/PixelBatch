@@ -1,0 +1,77 @@
+# Builds the Apple Silicon (arm64) Mac app on a GitHub Mac runner.
+# The .dmg is attached to the "Mac build (latest)" release and kept as a run artifact.
+name: Build Mac app
+
+on:
+  push:
+    branches: [main]
+    paths: ['src/**', 'package.json', 'package-lock.json', '.github/workflows/build-mac.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-mac
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: macos-15
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Build the app
+        run: npx electron-builder --mac dir --arm64 --publish never
+
+      # No Apple Developer ID, so sign ad hoc: Apple Silicon won't run unsigned code.
+      - name: Sign ad hoc
+        run: |
+          APP="dist/mac-arm64/PixelBatch.app"
+          codesign --force --deep --sign - "$APP"
+          codesign --verify --deep --strict --verbose=2 "$APP"
+
+      - name: Check the packaged engine works
+        run: |
+          APP="dist/mac-arm64/PixelBatch.app"
+          ELECTRON_RUN_AS_NODE=1 "$APP/Contents/MacOS/PixelBatch" -e '
+            const path = require("path");
+            const res = path.join(process.argv[1], "Contents/Resources/app.asar");
+            const P = require(path.join(res, "src/processor.js"));
+            (async () => {
+              for (const f of ["photo big.jpg", "doc.pdf", "logo.svg", "anim.gif"]) {
+                const t = await P.thumbnail(path.resolve("test/in", f));
+                console.log("ok", f, t.width + "x" + t.height);
+              }
+            })().catch(e => { console.error(e); process.exit(1); });
+          ' "$PWD/$APP"
+
+      - name: Make the .dmg
+        run: npx electron-builder --mac dmg --arm64 --prepackaged dist/mac-arm64/PixelBatch.app --publish never
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PixelBatch-mac-arm64
+          path: dist/*.dmg
+          if-no-files-found: error
+
+      - name: Update the "Mac build (latest)" release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git tag -f mac-latest
+          git push -f origin mac-latest
+          gh release view mac-latest >/dev/null 2>&1 || gh release create mac-latest --prerelease \
+            --title "Mac build (latest)" \
+            --notes "Apple Silicon build of the latest commit on main. Download the .dmg, drag PixelBatch to Applications, then run: xattr -cr /Applications/PixelBatch.app"
+          gh release upload mac-latest dist/*.dmg --clobber

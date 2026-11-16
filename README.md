@@ -17,7 +17,17 @@ npm run dist:win
 
 This makes `dist/PixelBatch Setup 1.0.0.exe` (installer) and a portable `.exe`.
 
-To build the Mac `.dmg`, run `npm install` and then `npm run dist:mac` **on a Mac**. The image libraries are native, so each platform must be built on that platform. For a version you can share without Gatekeeper warnings, sign it with an Apple Developer ID.
+### Mac (Apple Silicon)
+
+GitHub builds the Mac app automatically whenever the app's code changes on `main`. Download the `.dmg` from the [Mac build (latest)](https://github.com/redbox3/PixelBatch/releases/tag/mac-latest) release, open it and drag PixelBatch to Applications. The app isn't signed with an Apple Developer ID, so before opening it the first time, run this in Terminal:
+
+```bash
+xattr -cr /Applications/PixelBatch.app
+```
+
+To start a build by hand, open the repo's **Actions** tab, choose **Build Mac app** and click **Run workflow**.
+
+To build on a Mac yourself, run `npm install` and then `npm run dist:mac` **on the Mac**. The image libraries are native, so each platform must be built on that platform. For a version you can share without Gatekeeper warnings, sign it with an Apple Developer ID.
 
 ## Features
 
