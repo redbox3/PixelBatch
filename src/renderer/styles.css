@@ -245,3 +245,13 @@ details[open] > summary::before { transform: rotate(90deg); }
 .cull-lightbox { position: absolute; inset: 0; background: rgba(0,0,0,.88); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 20px; }
 .cull-lightbox img { max-width: 100%; max-height: calc(100% - 60px); object-fit: contain; }
 .cull-lb-bar { display: flex; gap: 10px; align-items: center; color: #fff; }
+
+/* ---------- settings ---------- */
+.topbar-end { margin-left: auto; font-size: 15px; }
+.modal-back { position: fixed; inset: 0; z-index: 50; background: rgba(0,0,0,.45); display: flex; align-items: center; justify-content: center; }
+.modal { width: min(520px, calc(100vw - 32px)); background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 18px 20px; box-shadow: 0 20px 60px rgba(0,0,0,.4); }
+.modal h2 { margin: 0 0 10px; font-size: 17px; }
+.modal h3 { margin: 16px 0 6px; font-size: 13px; color: var(--muted); font-weight: 600; }
+.app-pick { display: flex; align-items: center; gap: 8px; background: var(--panel-2); border: 1px solid var(--line); border-radius: var(--radius); padding: 8px 10px; }
+.app-pick > div { flex: 1; min-width: 0; }
+.app-pick .hint { margin: 2px 0 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

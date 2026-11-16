@@ -31,6 +31,7 @@
         </div>
       </div>
     </div>
+    <button id="btnSettings" class="btn icon topbar-end" title="Settings (Ctrl+,)">⚙</button>
   </header>
 
   <main class="layout">
@@ -425,6 +426,24 @@
   </dialog>
 
   <!-- Pick best shots -->
+  <div id="settingsView" class="modal-back" hidden>
+    <div class="modal" role="dialog" aria-labelledby="settingsTitle">
+      <h2 id="settingsTitle">Settings</h2>
+      <h3>Double-clicking a thumbnail</h3>
+      <label class="check"><input type="radio" name="dblClick" value="default"> Opens it in its default app</label>
+      <label class="check"><input type="radio" name="dblClick" value="app"> Opens it in the app below</label>
+      <label class="check"><input type="radio" name="dblClick" value="reveal"> <span id="revealLabel">Shows it in its folder</span></label>
+      <h3>App for opening images</h3>
+      <div class="app-pick">
+        <div><b id="appName">None chosen</b><div id="appPath" class="hint"></div></div>
+        <button id="btnPickApp" class="btn">Choose app…</button>
+        <button id="btnClearApp" class="btn ghost">Clear</button>
+      </div>
+      <p class="hint">Right-click a thumbnail to open it once in another app. Apps you've chosen before are listed there.</p>
+      <div class="btn-row end"><button id="btnSettingsClose" class="btn primary">Done</button></div>
+    </div>
+  </div>
+
   <div id="cullView" class="cull" hidden>
     <header class="cull-head">
       <h2>Pick best shots</h2>
@@ -460,5 +479,6 @@
   <div id="toast" class="toast" hidden></div>
   <script src="renderer.js"></script>
   <script src="cull-ui.js"></script>
+  <script src="settings-ui.js"></script>
 </body>
 </html>

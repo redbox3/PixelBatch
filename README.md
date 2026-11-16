@@ -27,6 +27,8 @@ To build the Mac `.dmg`, run `npm install` and then `npm run dist:mac` **on a Ma
 - SVG and PDF are rendered straight at the target size, so they stay sharp.
 - **Camera RAW files** (Nikon NEF/NRW, Canon CR2, Sony ARW/SR2, Pentax PEF, DNG) are read from the full-size JPEG the camera stores inside them. This is fast (about 0.3 s per photo) and needs no RAW converter. It looks like the camera's own JPEG, without the extra adjustment a RAW editor like Lightroom allows. Canon CR3 and Fuji RAF aren't supported yet.
 - Hidden `._` files that a Mac leaves when copying to Windows or USB drives are skipped.
+- **Double-click a thumbnail** to open it in its default app. In **⚙ Settings** you can make double-click open a chosen app instead (for example Photoshop), or show the file in its folder.
+- **Right-click a thumbnail** for *Open*, *Open with* (your chosen app, apps you've used before, *Choose an app…* and, on Windows, the Windows app list) and *Show in folder*.
 
 **Pick best shots** (the **★ Best** button)
 - Groups similar photos: shots taken close together (within 10 s, 30 s, 1 min, 5 min or at any time) that look alike. *Near identical* groups only burst frames; *Loosely alike* also groups shots of a scene from slightly different angles.
@@ -82,7 +84,7 @@ Multi-page PDFs and SVGs can go in as sources too. In both modes, a name pattern
 
 **Presets:** save, save as, duplicate, rename, delete, revert, and import/export as `.json` to share with colleagues. Presets are stored in the app's user-data folder. The starter presets include *Contact sheet 5 × 6* and *Images to PDF (A4)*. If you saved presets with an older version, add these with **⋯ → Add starter presets**.
 
-Shortcuts: `Ctrl/Cmd+O` add files, `Ctrl/Cmd+Shift+O` add folder, `Ctrl/Cmd+Enter` process, `Ctrl/Cmd+S` save preset, arrow keys move through files, `Delete` removes the selected file from the list.
+Shortcuts: `Ctrl/Cmd+,` settings, `Ctrl/Cmd+O` add files, `Ctrl/Cmd+Shift+O` add folder, `Ctrl/Cmd+Enter` process, `Ctrl/Cmd+S` save preset, arrow keys move through files, `Delete` removes the selected file from the list.
 
 ## Tests
 

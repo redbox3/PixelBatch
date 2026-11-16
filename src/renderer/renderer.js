@@ -790,10 +790,18 @@ function wire() {
     const i = state.files.findIndex(f => f.path === item.dataset.path);
     if (e.target.closest('.rm')) removeFile(i); else selectFile(i);
   });
+  // Double-click opens the file as chosen in Settings; right-click offers Open, Open with and Show in folder.
   $('#fileGrid').addEventListener('dblclick', e => {
     const item = e.target.closest('.file-item');
-    if (item) api.reveal(item.dataset.path);
+    if (item && !e.target.closest('.rm')) api.fileDblClick(item.dataset.path).catch(err => toast(err.message, 5000));
   });
+  $('#fileGrid').addEventListener('contextmenu', e => {
+    const item = e.target.closest('.file-item'); if (!item) return;
+    e.preventDefault();
+    selectFile(state.files.findIndex(f => f.path === item.dataset.path));
+    api.fileMenu(item.dataset.path);
+  });
+  api.onToast(msg => toast(msg, 5000));
 
   $('#pvSize').addEventListener('change', e => { state.sizeIndex = +e.target.value; updateNameExample(); schedulePreview(0); });
   $('#pvPrev').addEventListener('click', () => { if (state.page > 0) { state.page--; schedulePreview(0); } });
@@ -826,6 +834,7 @@ function wire() {
     if (cmd === 'addFiles') addPaths(await api.pickFiles());
     else if (cmd === 'addFolder') { const p = await api.pickFolder('Add folder'); if (p) addPaths([p]); }
     else if (cmd === 'process') processAll();
+    else if (cmd === 'settings') openSettings();
   });
 
   // Drag and drop anywhere on the window.

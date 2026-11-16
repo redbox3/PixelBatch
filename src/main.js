@@ -2,6 +2,7 @@ const { app, BrowserWindow, ipcMain, dialog, shell, Menu } = require('electron')
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
+const { spawn } = require('child_process');
 const P = require('./processor');
 const C = require('./cull');
 const defaults = require('./defaultPresets');
@@ -47,6 +48,8 @@ Menu.setApplicationMenu(Menu.buildFromTemplate([
     { label: 'Add Folder…', accelerator: 'CmdOrCtrl+Shift+O', click: () => win?.webContents.send('menu', 'addFolder') },
     { type: 'separator' },
     { label: 'Process', accelerator: 'CmdOrCtrl+Enter', click: () => win?.webContents.send('menu', 'process') },
+    { type: 'separator' },
+    { label: process.platform === 'darwin' ? 'Settings…' : 'Settings', accelerator: 'CmdOrCtrl+,', click: () => win?.webContents.send('menu', 'settings') },
     { type: 'separator' },
     process.platform === 'darwin' ? { role: 'close' } : { role: 'quit' },
   ] },
@@ -106,8 +109,97 @@ handle('preview', (file, preset, opts) => P.preview(file, preset, opts));
 handle('previewCombine', (files, preset, selected) => P.previewCombine(files, preset, selected));
 
 handle('buildName', (pattern, ctx, rename) => P.buildName(pattern, ctx, rename));
-handle('open', p => shell.openPath(p));
+handle('open', p => openDefault(p));
 handle('reveal', p => shell.showItemInFolder(p));
+
+// ---------- app settings and "Open with" ----------
+
+const settingsFile = () => path.join(app.getPath('userData'), 'settings.json');
+const SETTINGS = { dblClick: 'default', openWith: null, recentApps: [] };
+function loadSettings() {
+  try { return { ...SETTINGS, ...JSON.parse(fs.readFileSync(settingsFile(), 'utf8')) }; } catch { return { ...SETTINGS }; }
+}
+function saveSettings(patch) {
+  const s = { ...loadSettings(), ...patch };
+  fs.mkdirSync(path.dirname(settingsFile()), { recursive: true });
+  fs.writeFileSync(settingsFile(), JSON.stringify(s, null, 2));
+  return s;
+}
+const appName = p => path.basename(p).replace(/\.(exe|app|lnk)$/i, '');
+
+async function openDefault(file) {
+  const err = await shell.openPath(file);
+  if (err) throw new Error(err);
+  return true;
+}
+
+function openWithApp(file, appPath) {
+  if (!fs.existsSync(appPath)) throw new Error(`${appName(appPath)} isn't at ${appPath} any more. Choose it again in Settings.`);
+  return new Promise((resolve, reject) => {
+    const child = process.platform === 'darwin'
+      ? spawn('open', ['-a', appPath, file], { detached: true, stdio: 'ignore' })
+      : spawn(appPath, [file], { detached: true, stdio: 'ignore', cwd: path.dirname(appPath) });
+    child.once('error', reject);
+    child.once('spawn', () => { child.unref(); resolve(true); });
+  });
+}
+
+// Shows a file picker for an application and remembers it in the recent list.
+async function pickApp(title = 'Choose an app to open images with') {
+  const mac = process.platform === 'darwin';
+  const r = await dialog.showOpenDialog(win, {
+    title,
+    defaultPath: mac ? '/Applications' : process.env.ProgramFiles,
+    properties: ['openFile'],
+    filters: mac ? [{ name: 'Applications', extensions: ['app'] }] : [{ name: 'Programs', extensions: ['exe'] }],
+  });
+  if (r.canceled) return null;
+  const appPath = r.filePaths[0];
+  const s = loadSettings();
+  saveSettings({ recentApps: [appPath, ...s.recentApps.filter(a => a !== appPath)].slice(0, 6) });
+  return { path: appPath, name: appName(appPath) };
+}
+
+function openWithSystemList(file) {
+  // Windows' own "How do you want to open this file?" list.
+  spawn('rundll32.exe', ['shell32.dll,OpenAs_RunDLL', file], { detached: true, stdio: 'ignore' }).unref();
+  return true;
+}
+
+async function doubleClick(file) {
+  const s = loadSettings();
+  if (s.dblClick === 'reveal') return shell.showItemInFolder(file);
+  if (s.dblClick === 'app' && s.openWith) return openWithApp(file, s.openWith);
+  return openDefault(file);
+}
+
+handle('settings:get', () => ({ ...loadSettings(), platform: process.platform }));
+handle('settings:set', patch => saveSettings(patch));
+handle('settings:pickApp', async () => {
+  const a = await pickApp();
+  return a ? saveSettings({ openWith: a.path }) : null;
+});
+handle('file:dblclick', file => doubleClick(file));
+
+// Right-click menu for a thumbnail.
+handle('file:menu', file => new Promise(resolve => {
+  const s = loadSettings();
+  const report = p => Promise.resolve(p).catch(err => win.webContents.send('toast', err.message));
+  const apps = [s.openWith, ...s.recentApps].filter((a, i, all) => a && all.indexOf(a) === i && fs.existsSync(a));
+  const openWith = [
+    ...apps.map(a => ({ label: appName(a) + (a === s.openWith ? '  (default)' : ''), click: () => report(openWithApp(file, a)) })),
+    ...(apps.length ? [{ type: 'separator' }] : []),
+    { label: 'Choose an app…', click: () => report(pickApp().then(a => a && openWithApp(file, a.path))) },
+    ...(process.platform === 'win32' ? [{ label: 'Windows app list…', click: () => openWithSystemList(file) }] : []),
+  ];
+  Menu.buildFromTemplate([
+    { label: 'Open', click: () => report(openDefault(file)) },
+    { label: 'Open with', submenu: openWith },
+    { label: process.platform === 'darwin' ? 'Show in Finder' : 'Show in folder', click: () => shell.showItemInFolder(file) },
+    { type: 'separator' },
+    { label: 'Settings…', click: () => win.webContents.send('menu', 'settings') },
+  ]).popup({ window: win, callback: () => resolve(true) });
+}));
 
 handle('cancel', () => { cancelled = true; return true; });
 
