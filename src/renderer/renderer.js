@@ -10,6 +10,8 @@ const state = {
   dirty: false,
   files: [],
   selected: -1,
+  picked: new Set(), // multi-selection (file objects); with 0 or 1 picked, actions use every file
+  anchor: -1,       // where a Shift-click range starts
   page: 0,
   pageCount: 1,
   sizeIndex: 0,
@@ -392,10 +394,11 @@ async function updateNameExample() {
   const ext = p.mode === 'rename' ? ctx_ext(fname) : ctx.format;
   try {
     if (isCombine(p)) {
-      const group = state.files[p.groupBy === 'folder' ? state.selected : 0] || f;
+      const targets = targetFiles();
+      const group = (p.groupBy === 'folder' && targets.includes(f) ? f : targets[0]) || f;
       const folder = group ? group.path.split(/[\\/]/).slice(-2, -1)[0] : 'Photos';
       const cext = p.mode === 'pdf' ? 'pdf' : ({ jpeg: 'jpg', tiff: 'tif', original: 'jpg' }[p.format] || p.format);
-      const pages = p.mode === 'sheet' && p.sheet?.rows > 0 ? Math.ceil(state.files.length / ((p.sheet.columns || 4) * p.sheet.rows)) : 1;
+      const pages = p.mode === 'sheet' && p.sheet?.rows > 0 ? Math.ceil(targets.length / ((p.sheet.columns || 4) * p.sheet.rows)) : 1;
       const name = await api.buildName(p.combineName, { name: folder, folder, preset: p.name, index: p.renameStart ?? 1, page: 1, pageCount: pages, format: cext }, p.rename);
       $('#combineExample').textContent = `${name}.${cext}${pages > 1 ? `  (+${pages - 1} more)` : ''}`;
       return;
@@ -484,6 +487,24 @@ function fileItemHtml(f) {
 
 function escapeHtml(s) { return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
 
+// Files that Process, the contact sheet and the PDF work on: the selection when 2+ files are selected, otherwise all.
+const pickedFiles = () => state.files.filter(f => state.picked.has(f));
+const targetFiles = () => { const p = pickedFiles(); return p.length > 1 ? p : state.files; };
+const isMulti = () => pickedFiles().length > 1;
+const itemClass = f => `file-item ${f.status || ''} ${state.files[state.selected] === f ? 'sel' : ''} ${isMulti() && state.picked.has(f) ? 'picked' : ''}`;
+const filePayload = files => files.map(({ path, root, name, ext, bytes, mtime }) => ({ path, root, name, ext, bytes, mtime }));
+
+function updateSelectionInfo() {
+  const total = state.files.reduce((a, f) => a + f.bytes, 0);
+  const picked = pickedFiles();
+  const multi = picked.length > 1;
+  $('#fileCount').textContent = !state.files.length ? 'No files'
+    : multi ? `${picked.length} of ${state.files.length} selected · ${fmtBytes(picked.reduce((a, f) => a + f.bytes, 0))}`
+    : `${state.files.length} file${state.files.length > 1 ? 's' : ''} · ${fmtBytes(total)}`;
+  $('#btnSelectNone').hidden = !multi;
+  $('#btnProcess').textContent = multi ? `Process ${picked.length} selected` : 'Process';
+}
+
 function renderFiles() {
   const grid = $('#fileGrid');
   grid.innerHTML = '';
@@ -491,7 +512,7 @@ function renderFiles() {
   const frag = document.createDocumentFragment();
   state.files.forEach((f, i) => {
     const el = document.createElement('div');
-    el.className = `file-item ${f.status || ''} ${i === state.selected ? 'sel' : ''}`;
+    el.className = itemClass(f);
     el.dataset.path = f.path;
     el.innerHTML = fileItemHtml(f);
     if (f.error) el.title = f.error;
@@ -501,25 +522,36 @@ function renderFiles() {
   });
   grid.appendChild(frag);
   $('#emptyDrop').hidden = state.files.length > 0;
-  const total = state.files.reduce((a, f) => a + f.bytes, 0);
-  $('#fileCount').textContent = state.files.length ? `${state.files.length} file${state.files.length > 1 ? 's' : ''} · ${fmtBytes(total)}` : 'No files';
+  updateSelectionInfo();
   updateVisibility();
 }
 
 function updateFileItem(f) {
   if (!f.el) return;
-  f.el.className = `file-item ${f.status || ''} ${state.files[state.selected] === f ? 'sel' : ''}`;
+  f.el.className = itemClass(f);
   f.el.innerHTML = fileItemHtml(f);
   f.el.title = f.error || '';
 }
 
-function selectFile(i) {
+// how: 'single' (plain click), 'toggle' (Ctrl/Cmd-click), 'range' (Shift-click) or 'focus' (keep the selection).
+function selectFile(i, how = 'single') {
   if (i < 0 || i >= state.files.length) return;
+  const wasMulti = isMulti();
+  const f = state.files[i];
+  if (how === 'single') { state.picked = new Set([f]); state.anchor = i; }
+  else if (how === 'toggle') {
+    if (state.picked.size === 0 && state.files[state.selected]) state.picked.add(state.files[state.selected]);
+    if (state.picked.has(f) && state.picked.size > 1) state.picked.delete(f); else state.picked.add(f);
+    state.anchor = i;
+  } else if (how === 'range') {
+    const a = state.anchor >= 0 && state.anchor < state.files.length ? state.anchor : Math.max(0, state.selected);
+    state.picked = new Set(state.files.slice(Math.min(a, i), Math.max(a, i) + 1));
+  }
   const prev = state.files[state.selected];
   state.selected = i;
-  if (prev) updateFileItem(prev);
-  const f = state.files[i];
-  updateFileItem(f);
+  if (wasMulti || isMulti()) { for (const x of state.files) if (x.el) x.el.className = itemClass(x); }
+  else { if (prev) updateFileItem(prev); updateFileItem(f); }
+  updateSelectionInfo();
   f.el?.scrollIntoView({ block: 'nearest' });
   state.page = 0;
   state.pageCount = f.ext === 'pdf' ? (f.meta?.pages || 1) : 1;
@@ -531,15 +563,45 @@ function selectFile(i) {
 function removeFile(i) {
   const [f] = state.files.splice(i, 1);
   if (f?.thumbUrl) URL.revokeObjectURL(f.thumbUrl);
+  state.picked.delete(f);
   if (state.selected >= state.files.length) state.selected = state.files.length - 1;
   renderFiles();
   if (state.selected >= 0) selectFile(state.selected); else clearPreview();
+}
+
+// Delete with several files selected removes them all from the list (the files themselves are untouched).
+function removeSelected() {
+  if (!isMulti()) return state.selected >= 0 && removeFile(state.selected);
+  const gone = pickedFiles();
+  for (const f of gone) if (f.thumbUrl) URL.revokeObjectURL(f.thumbUrl);
+  const first = state.files.indexOf(gone[0]);
+  state.files = state.files.filter(f => !state.picked.has(f));
+  state.picked = new Set();
+  state.selected = -1;
+  renderFiles();
+  if (state.files.length) selectFile(Math.min(first, state.files.length - 1)); else clearPreview();
+  toast(`Removed ${gone.length} files from the list`);
+}
+
+function selectAll() {
+  if (!state.files.length) return;
+  state.picked = new Set(state.files);
+  if (state.selected < 0) state.selected = 0;
+  for (const f of state.files) if (f.el) f.el.className = itemClass(f);
+  updateSelectionInfo();
+  updateNameExample();
+  if (isCombine(state.draft)) schedulePreview(0);
+}
+
+function selectNone() {
+  if (state.selected >= 0) selectFile(state.selected);
 }
 
 function clearFiles() {
   for (const f of state.files) if (f.thumbUrl) URL.revokeObjectURL(f.thumbUrl);
   state.files = [];
   state.selected = -1;
+  state.picked = new Set();
   renderFiles();
   clearPreview();
   $('#statusText').textContent = 'Ready';
@@ -598,8 +660,8 @@ async function runPreview() {
       return;
     }
     if (isCombine(state.draft)) {
-      const payload = state.files.map(({ path, root, name, ext, bytes, mtime }) => ({ path, root, name, ext, bytes, mtime }));
-      const r = await api.previewCombine(payload, state.draft, state.selected);
+      const targets = targetFiles();
+      const r = await api.previewCombine(filePayload(targets), state.draft, Math.max(0, targets.indexOf(state.files[state.selected])));
       if (req !== previewReq) return;
       if (resUrl) URL.revokeObjectURL(resUrl);
       resUrl = URL.createObjectURL(new Blob([r.data], { type: r.type }));
@@ -667,12 +729,13 @@ async function processAll() {
   }
   state.running = true;
   state.moving = preset.mode === 'rename' && !!preset.renameMove;
-  for (const f of state.files) { f.status = ''; f.error = ''; updateFileItem(f); }
+  const targets = targetFiles();
+  for (const f of targets) { f.status = ''; f.error = ''; updateFileItem(f); }
   $('#btnCancel').hidden = false;
   $('#btnProcess').disabled = true;
   $('#progressBar').style.width = '0';
-  $('#statusText').textContent = `Processing ${state.files.length} file(s)…`;
-  const payload = state.files.map(({ path, root, name, ext, bytes, mtime }) => ({ path, root, name, ext, bytes, mtime }));
+  $('#statusText').textContent = `Processing ${targets.length} ${targets.length < state.files.length ? 'selected ' : ''}file(s)…`;
+  const payload = filePayload(targets);
   try {
     const summary = await api.process(payload, preset);
     state.lastSummary = { ...summary, outputDir: preset.outputDir };
@@ -704,7 +767,8 @@ function onProgress(d) {
   if (f && movedTo) followMove(f, movedTo);
   if (f) { f.status = d.status; f.error = d.error || ''; updateFileItem(f); }
   $('#progressBar').style.width = `${(d.done / d.total) * 100}%`;
-  $('#statusText').textContent = `Processing… ${d.done}/${d.total}${d.status === 'error' ? ` — ${f?.name}: ${d.error}` : ''}`;
+  // A message that arrives after the batch has finished must not overwrite "Done".
+  if (state.running) $('#statusText').textContent = `Processing… ${d.done}/${d.total}${d.status === 'error' ? ` — ${f?.name}: ${d.error}` : ''}`;
 }
 
 function showSummary() {
@@ -788,7 +852,8 @@ function wire() {
   $('#fileGrid').addEventListener('click', e => {
     const item = e.target.closest('.file-item'); if (!item) return;
     const i = state.files.findIndex(f => f.path === item.dataset.path);
-    if (e.target.closest('.rm')) removeFile(i); else selectFile(i);
+    if (e.target.closest('.rm')) removeFile(i);
+    else selectFile(i, e.shiftKey ? 'range' : (e.ctrlKey || e.metaKey) ? 'toggle' : 'single');
   });
   // Double-click opens the file as chosen in Settings; right-click offers Open, Open with and Show in folder.
   $('#fileGrid').addEventListener('dblclick', e => {
@@ -798,7 +863,8 @@ function wire() {
   $('#fileGrid').addEventListener('contextmenu', e => {
     const item = e.target.closest('.file-item'); if (!item) return;
     e.preventDefault();
-    selectFile(state.files.findIndex(f => f.path === item.dataset.path));
+    const i = state.files.findIndex(f => f.path === item.dataset.path);
+    selectFile(i, state.picked.has(state.files[i]) && isMulti() ? 'focus' : 'single');
     api.fileMenu(item.dataset.path);
   });
   api.onToast(msg => toast(msg, 5000));
@@ -826,6 +892,7 @@ function wire() {
   initSplit();
 
   $('#btnProcess').addEventListener('click', processAll);
+  $('#btnSelectNone').addEventListener('click', selectNone);
   $('#btnCancel').addEventListener('click', () => { api.cancel(); $('#statusText').textContent = 'Cancelling…'; });
   $('#btnSummary').addEventListener('click', showSummary);
   $('#btnSumOpen').addEventListener('click', () => state.lastSummary && api.open(state.lastSummary.outputDir));
@@ -853,11 +920,14 @@ function wire() {
   document.addEventListener('keydown', e => {
     if (e.target.matches('input, select, textarea') || document.querySelector('dialog[open]')) return;
     const cols = state.view === 'grid' ? Math.max(1, Math.round($('#fileGrid').clientWidth / ((state.files[0]?.el?.offsetWidth || 128) + 8))) : 1;
-    if (e.key === 'ArrowRight' || (e.key === 'ArrowDown' && state.view === 'list')) selectFile(state.selected + 1);
-    else if (e.key === 'ArrowLeft' || (e.key === 'ArrowUp' && state.view === 'list')) selectFile(state.selected - 1);
-    else if (e.key === 'ArrowDown') selectFile(Math.min(state.files.length - 1, state.selected + cols));
-    else if (e.key === 'ArrowUp') selectFile(Math.max(0, state.selected - cols));
-    else if ((e.key === 'Delete' || e.key === 'Backspace') && state.selected >= 0) removeFile(state.selected);
+    const how = e.shiftKey ? 'range' : 'single';
+    if (e.key === 'ArrowRight' || (e.key === 'ArrowDown' && state.view === 'list')) selectFile(state.selected + 1, how);
+    else if (e.key === 'ArrowLeft' || (e.key === 'ArrowUp' && state.view === 'list')) selectFile(state.selected - 1, how);
+    else if (e.key === 'ArrowDown') selectFile(Math.min(state.files.length - 1, state.selected + cols), how);
+    else if (e.key === 'ArrowUp') selectFile(Math.max(0, state.selected - cols), how);
+    else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') selectAll();
+    else if (e.key === 'Escape' && isMulti()) selectNone();
+    else if ((e.key === 'Delete' || e.key === 'Backspace') && state.selected >= 0) removeSelected();
     else return;
     e.preventDefault();
   });

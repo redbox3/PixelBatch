@@ -37,6 +37,7 @@ To build on a Mac yourself, run `npm install` and then `npm run dist:mac` **on t
 - SVG and PDF are rendered straight at the target size, so they stay sharp.
 - **Camera RAW files** (Nikon NEF/NRW, Canon CR2, Sony ARW/SR2, Pentax PEF, DNG) are read from the full-size JPEG the camera stores inside them. This is fast (about 0.3 s per photo) and needs no RAW converter. It looks like the camera's own JPEG, without the extra adjustment a RAW editor like Lightroom allows. Canon CR3 and Fuji RAF aren't supported yet.
 - Hidden `._` files that a Mac leaves when copying to Windows or USB drives are skipped.
+- **Select several files** with Ctrl-click (Cmd-click on a Mac), Shift-click for a range, Shift+arrow keys, or Ctrl/Cmd+A for all. Process, the contact sheet and the PDF then use only the selected files, and the button shows how many. Delete removes them from the list, and Esc or **Select none** goes back to all files.
 - **Double-click a thumbnail** to open it in its default app. In **⚙ Settings** you can make double-click open a chosen app instead (for example Photoshop), or show the file in its folder.
 - **Right-click a thumbnail** for *Open*, *Open with* (your chosen app, apps you've used before, *Choose an app…* and, on Windows, the Windows app list) and *Show in folder*.
 
@@ -94,7 +95,7 @@ Multi-page PDFs and SVGs can go in as sources too. In both modes, a name pattern
 
 **Presets:** save, save as, duplicate, rename, delete, revert, and import/export as `.json` to share with colleagues. Presets are stored in the app's user-data folder. The starter presets include *Contact sheet 5 × 6* and *Images to PDF (A4)*. If you saved presets with an older version, add these with **⋯ → Add starter presets**.
 
-Shortcuts: `Ctrl/Cmd+,` settings, `Ctrl/Cmd+O` add files, `Ctrl/Cmd+Shift+O` add folder, `Ctrl/Cmd+Enter` process, `Ctrl/Cmd+S` save preset, arrow keys move through files, `Delete` removes the selected file from the list.
+Shortcuts: `Ctrl/Cmd+,` settings, `Ctrl/Cmd+O` add files, `Ctrl/Cmd+Shift+O` add folder, `Ctrl/Cmd+Enter` process, `Ctrl/Cmd+S` save preset, arrow keys move through files (add Shift to select a range), `Ctrl/Cmd+A` selects all, `Esc` selects none, `Delete` removes the selected files from the list.
 
 ## Tests
 

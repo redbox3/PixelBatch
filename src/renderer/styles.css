@@ -98,6 +98,11 @@ input[type=checkbox] { accent-color: var(--accent); margin: 0; }
 .file-item { position: relative; background: var(--panel-2); border: 1px solid var(--line); border-radius: var(--radius); padding: 6px; cursor: pointer; }
 .file-item:hover { border-color: #4a5160; }
 .file-item.sel { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.file-item.picked { border-color: var(--accent); background: var(--accent-soft); }
+.file-item.picked::after { content: '\2713'; position: absolute; bottom: 46px; right: 11px; box-shadow: 0 0 0 2px var(--panel-2); width: 18px; height: 18px; border-radius: 50%; background: var(--accent); color: #fff; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+.file-item.picked.sel { box-shadow: 0 0 0 2px var(--accent); }
+.file-grid.list .file-item.picked::after { bottom: auto; top: 14px; right: 88px; }
+.file-area { user-select: none; }
 .file-item .th { aspect-ratio: 1; border-radius: 5px; display: flex; align-items: center; justify-content: center; overflow: hidden;
   background: repeating-conic-gradient(var(--checker-a) 0 25%, var(--checker-b) 0 50%) 0 0 / 14px 14px; }
 .file-item .th img { max-width: 100%; max-height: 100%; object-fit: contain; }
